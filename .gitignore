@@ -1,0 +1,9 @@
+*.avi
+*.asv
+*.jpg
+*.mp4
+.obsidian/
+figures/
+*.png
+*.fig
+
