@@ -12,11 +12,11 @@ classdef robot_nx < handle
         m0 = 3*ones(8,1);
         
         % Bearing Model
-        b_sigma = deg2rad(1);
+        b_sigma = deg2rad(0);
         % To stop bearing noise let b_sigma = 0;
         
         % Range Model
-        r_sigma = 1;
+        r_sigma = 0;
         % To stop range noise let r_sigma = 0;        
         
         

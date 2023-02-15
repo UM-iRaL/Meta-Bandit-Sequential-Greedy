@@ -43,7 +43,7 @@ classdef target_v1 < handle
             this.all_min_dist(t) = min_dist;
             if strcmp(this.state, 'regular')
                 if strcmp(this.type,'circle')
-                    ang_v = this.v/80;
+                    ang_v = this.v/200;
                     this.x(t+1, 3) = this.x(t, 3) + ang_v * this.dT;
                     %this.gamma = pi/2 * (this.target_id-1);
                     this.x(t+1, 1:2) = this.x(t, 1:2) + (this.v*this.dT)*[cos(this.x(t, 3)) sin(this.x(t, 3))]; %do nothing.

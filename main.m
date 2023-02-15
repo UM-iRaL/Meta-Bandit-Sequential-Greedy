@@ -1,22 +1,22 @@
-%% non-adversarial two robots vs. three targets battle.
 clear all;
 close all;
 
 % Should we get video and image?
-vid = false;
+vid = true;
 viz = true;
 draw = false;
 planner_name = 'bsg';
-vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
+%vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
+vid_name = strcat(strcat('video\one_vs_one_', planner_name),'_test.mp4');
 mode = 'experiment';
 % mode = 'experiment';
 % Experiment parameters
-Horizon = 100;
-num_rep = 2;
-run_len = 2000;
+Horizon = 50;
+num_rep = 1;
+run_len = 1000;
 dT = Horizon / run_len;
-num_robot = 2;
-num_tg = 3;
+num_robot = 1;
+num_tg = 1;
 map_size = 100;
 rng(1,'philox');
 
@@ -34,7 +34,7 @@ vis_map = init_blank_ndmap([-1000; -1000],[1000; 1000],0.25,'logical');
 % Initial pose for robots
 x_true = zeros(run_len+1, num_robot,3,num_rep); % robots
 x_true(1, 1, :, :) = repmat([-150;0;0],1,num_rep);
-x_true(1, 2, :, :) = repmat([0; -110; pi/2],1,num_rep);
+% x_true(1, 2, :, :) = repmat([0; -110; pi/2],1,num_rep);
 % x_true(1, 3, :, :) = repmat([-30; 0; pi],1,num_rep);
 % x_true(1, 4, :, :) = repmat([0; -30; 3/2*pi],1,num_rep);
 
@@ -42,8 +42,8 @@ x_true(1, 2, :, :) = repmat([0; -110; pi/2],1,num_rep);
 tg_true = zeros(3,num_tg,run_len+1,num_rep); % dynamic target
 % first two are position, last one is id
 tg_true(:,1,1,:) = repmat([-90;0;1],1,num_rep);
-tg_true(:,2,1,:) = repmat([0;-120;2],1,num_rep);
-tg_true(:,3,1,:) = repmat([-80;0;3],1,num_rep);
+% tg_true(:,2,1,:) = repmat([0;-120;2],1,num_rep);
+% tg_true(:,3,1,:) = repmat([-80;0;3],1,num_rep);
 % tg_true(:,4,1,:) = repmat([0;-80;4],1,num_rep);
 
 
@@ -72,11 +72,11 @@ for rep = 1:num_rep
         end
     end
     % Create Robots and Planners
-    v_robot = [1.3; 1.1]*20;
-    r_senses = [150;100];
-    fovs = [deg2rad(64); deg2rad(94)];
+    v_robot = [2]*20;
+    r_senses = [150];
+    fovs = [deg2rad(64)];
     dT_robo = Horizon / run_len * ones(num_robot, 1);
-    R = init_robots_array(num_robot, squeeze(x_true(1, :, :, rep)), r_senses, fovs, dT_robo);
+    R = init_robots_array(num_robot, reshape(squeeze(x_true(1, :, :, rep)), num_robot, 3), r_senses, fovs, dT_robo);
     for r = 1:num_robot        
         P(r) = bsg_planner_nx_v1(num_robot,r, v_robot(r)*ACTION_SET, run_len, R(r).T, R(r).r_sense,...
             R(r).fov,[R(r).r_sigma;R(r).b_sigma]);
@@ -84,12 +84,17 @@ for rep = 1:num_rep
         G(r) = greedy_planner_v2(num_robot, r, ACTION_SET, R(r).T, R(r).r_sense,...
             R(r).fov);
     end
-    v_tg = [0.3; 0.5; 0.72]*20;
-    yaw_tg = [0; deg2rad(90); deg2rad(-90)];
-    motion_tg = ["straight"; "straight"; "circle"];
-    type_tg = ["normal"; "normal"; "normal"];
-    dT_tg = [Horizon / run_len; Horizon / run_len; Horizon / run_len];
+    v_tg = 25;
+    yaw_tg = 0;
+    motion_tg = "circle";
+    type_tg = "normal";
+    dT_tg = Horizon / run_len;
     T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:,:, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
+    
+    memory_len = 3;
+    memory_noise = 0.05;
+    predict_horizon = 2;
+    human_expert = human_nx(num_tg, memory_len, memory_noise, predict_horizon);
     % Visualization
     if viz
         figure('Color',[1 1 1],'Position',[0,0,900,800]);
@@ -98,27 +103,28 @@ for rep = 1:num_rep
             [vis_map.pos{2}(1);vis_map.pos{2}(end)],vis_map.map.');
         cbone = bone; colormap(cbone(end:-1:(end-30),:));
               
-        axis([-200,900,-200,900]);
+        axis([-300,200,-50,450]);
         for r = 1:num_robot
             if r == 1
                 r_color = 'b';
             elseif r == 2
                 r_color = 'r';
             end
-            h0.rob(r) = draw_pose_nx([],permute(x_true(1,r,:,rep),[3 2 1]),r_color,5);
+            h0.rob(r) = draw_pose_nx([],permute(x_true(1,r,:,rep),[3 2 1]),r_color,15);
             h0.fov(r) = draw_fov_nx([],permute(x_true(1,r,:,rep),[3 2 1]),R(r).fov,R(r).r_sense, r_color);
         end
         %h0.xe = draw_traj_nx([],permute(x_save(1,:,:,rep),[1 3 2]),'r:');
         h0.tg_cov = [];
         h0.tg = [];
         h0.ye = [];
+        h0.pred = [];
         for kk = 1:num_tg
             h0.tg(kk) = draw_pose_nx([], T(kk).get_pose(1)','g',15);
         end
         if strcmp(planner_name, 'bsg')
-            title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
+            title('BSG: 1 Robots vs. 1 Non-Adversarial Targets [2X]', 'FontSize', 15);
         else
-            title('SG-Heuristic: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
+            title('SG-Heuristic: 1 Robots vs. 1 Non-Adversarial Targets [2X]', 'FontSize', 15);
         end
             subtitle(sprintf('Time: %.2fs, Time Step: %d',0*dT, 0));
         xlabel('x [m]','FontSize',15);
@@ -134,17 +140,11 @@ for rep = 1:num_rep
     end
 
     % Sense -> Log Measurements -> Plan Moves -> Move Targets -> Move Robots
-    viz = false;
     for t = 1:run_len
         if t==run_len-1
             if strcmp(mode, 'experiment')
                 viz = true;
             end
-        end
-        if t == floor(490/2000 * run_len)
-            T(3).set_v(10);
-            T(3).set_yaw(t-1, deg2rad(90));
-            T(3).set_type('straight');
         end
         % Move Targets and get targets' positions at t
         if t > 1
@@ -206,6 +206,7 @@ for rep = 1:num_rep
             Z_d = z_d_save{t, r, rep};
             target_map(r) = Z_d;
         end
+
         estm_tg = zeros(2, num_tg);
         estm_tg_cov = zeros(2, 2, num_tg);
         detected = false(1, num_tg);
@@ -242,7 +243,13 @@ for rep = 1:num_rep
         estm_tg_cov_save{t, rep} = estm_tg_cov(:,:,detected);
         estm_tg_save{t, rep} = estm_tg(:, detected);
         estm_tg =  estm_tg(:, detected);
+        id_array = 1:num_tg;
+        ids = id_array(detected);
+%         pred = [];
+        human_expert.memorize(t, estm_tg, ids);
+        pred = human_expert.predictBezier;
 
+        
         for kk = 1:num_tg
             if ~detected(kk)
                 cov_z = [R(r).r_sigma 0; 0 R(r).b_sigma];
@@ -251,7 +258,6 @@ for rep = 1:num_rep
             end
             all_tg_cov(kk*2-1:kk*2, kk*2-1:kk*2, t, rep) = estm_tg_cov(:, :, kk);
         end
-
 
         % At every time step t, first compute objective function using the robots'
         % positions at t (planned at t-1) and the environment at t
@@ -262,7 +268,6 @@ for rep = 1:num_rep
             r_senses(i) = R(r).r_sense;
             fovs(i) = R(r).fov;
         end
-
                 
         if strcmp(planner_name, 'bsg')
             % BSG: update experts after selecting actions
@@ -328,15 +333,22 @@ for rep = 1:num_rep
             for kk = 1 : num_tg
                 h0.tg(kk) = draw_pose_nx(h0.tg(kk), T(kk).get_pose(t)','g',15);
             end
-            lgd = legend([h0.r_traj(1) h0.r_traj(2) h0.y(1)], 'Robot 1', 'Robot 2', 'Targets', 'location', 'northeast');
+            if ~isempty(pred)
+                for kk = 1 : size(pred, 2)
+                    id = pred(1, kk);
+                    pred_line = [human_expert.tar_cur(:, kk) pred(2:end, kk)];
+                    h0.pred = draw_pred_nx(h0.pred, pred_line);
+                end
+            end
+            lgd = legend([h0.r_traj(1) h0.y(1)], 'Robot 1', 'Targets', 'location', 'northeast');
             lgd.FontSize = 12;
             legend boxoff;
-            axis([-200,900,-200,900]);
-            if strcmp(planner_name, 'bsg')
-                title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
-            else
-                title('SG-Heuristic: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
-            end
+            axis([-300,200,-50,450]);
+%             if strcmp(planner_name, 'bsg')
+%                 title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
+%             else
+%                 title('SG-Heuristic: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
+%             end
             subtitle(sprintf('Time: %.2fs, Time Step: %d',t*dT, t));
             drawnow;
             %pause(0.125)
@@ -346,12 +358,12 @@ for rep = 1:num_rep
             end
         end
     end
-    for kk = 1:num_tg
-        %min_dist(kk, 1:end-1, rep) = T(kk).all_min_dist(:)';
-        for t = 1:run_len
-            min_dist(kk, t, rep) = T(kk).min_dist_to_robots(t, squeeze(x_true(t,:,:,rep)));
-        end
-    end
+%     for kk = 1:num_tg
+%         %min_dist(kk, 1:end-1, rep) = T(kk).all_min_dist(:)';
+% %         for t = 1:run_len
+% %             %min_dist(kk, t, rep) = T(kk).min_dist_to_robots(t, squeeze(x_true(t,:,:,rep)));
+% %         end
+%     end
     if viz && vid
         close(writerObj);
     end
