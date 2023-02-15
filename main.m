@@ -2,7 +2,7 @@ clear all;
 close all;
 
 % Should we get video and image?
-vid = true;
+vid = false;
 viz = true;
 draw = false;
 planner_name = 'bsg';
@@ -91,10 +91,11 @@ for rep = 1:num_rep
     dT_tg = Horizon / run_len;
     T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:,:, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
     
-    memory_len = 3;
+    memory_len = 10;
     memory_noise = 0.05;
-    predict_horizon = 2;
+    predict_horizon = 1 / Horizon * run_len; % unit: time step
     human_expert = human_nx(num_tg, memory_len, memory_noise, predict_horizon);
+    last_time_mem = 1;
     % Visualization
     if viz
         figure('Color',[1 1 1],'Position',[0,0,900,800]);
@@ -103,7 +104,7 @@ for rep = 1:num_rep
             [vis_map.pos{2}(1);vis_map.pos{2}(end)],vis_map.map.');
         cbone = bone; colormap(cbone(end:-1:(end-30),:));
               
-        axis([-300,200,-50,450]);
+        axis([-350,150,-50,450]);
         for r = 1:num_robot
             if r == 1
                 r_color = 'b';
@@ -245,10 +246,13 @@ for rep = 1:num_rep
         estm_tg =  estm_tg(:, detected);
         id_array = 1:num_tg;
         ids = id_array(detected);
-%         pred = [];
-        human_expert.memorize(t, estm_tg, ids);
-        pred = human_expert.predictBezier;
-
+        pred = [];
+        
+        if (t - last_time_mem) >= 0.25 / Horizon * run_len
+            human_expert.memorize(t, estm_tg, ids);
+            pred = human_expert.predictBezier;
+            last_time_mem = t;
+        end
         
         for kk = 1:num_tg
             if ~detected(kk)
@@ -343,7 +347,7 @@ for rep = 1:num_rep
             lgd = legend([h0.r_traj(1) h0.y(1)], 'Robot 1', 'Targets', 'location', 'northeast');
             lgd.FontSize = 12;
             legend boxoff;
-            axis([-300,200,-50,450]);
+            axis([-350,150,-50,450]);
 %             if strcmp(planner_name, 'bsg')
 %                 title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
 %             else

@@ -11,7 +11,7 @@ classdef Queue < handle
 
     methods
         function obj = Queue
-            obj.elements = cell(1, 10);
+            obj.elements = cell(1, 30);
             obj.nextInsert = 1;
             obj.nextRemove = 1;
         end

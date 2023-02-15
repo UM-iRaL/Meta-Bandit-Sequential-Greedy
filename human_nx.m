@@ -39,15 +39,17 @@ classdef human_nx < handle
             % pred : 4 x num_tg (id; t; x; y) 
             pred = zeros(4, 0);
             for i = 1:size(this.targetsLogger, 1)
-                curr_Q = cell2mat(this.targetsLogger(i).elements);
-                if size(curr_Q, 2) == 1 || size(curr_Q, 2) == 0
+                curr_W = cell2mat(this.targetsLogger(i).elements);  % current waypoints.
+                if size(curr_W, 2) == 1 || size(curr_W, 2) == 0
                     continue;
                 end
-                total_time = curr_Q(1, end) - curr_Q(1, 1);
-                predict_ratio = (total_time + this.predict_len)/ total_time;
-                cur_pred = BezierLocal(curr_Q, predict_ratio);
+                last_time_interval = curr_W(1, end) - curr_W(1, end - 1);
+                predict_ratio = (last_time_interval + this.predict_len) / last_time_interval;
+                 
+                [Bez, ~] =GnBezierFit(curr_W(2:end, :), 3);
+                cur_pred = BezierLocal(Bez(end).Q, predict_ratio);
                 % patch id to prediction
-                cur_pred = [i;cur_pred(2:end)];
+                cur_pred = [i*ones(1, size(cur_pred, 2));cur_pred];
                 pred = [pred cur_pred];
             end
         end
