@@ -21,6 +21,7 @@ classdef human_nx < handle
         function memorize(this, t, estm_tg, ids)
             % Input:
             % estm_tg: estimated targets position 2 x num_det
+            % ids: corresponding id for targets.
             num_det = size(estm_tg, 2);
             for i = 1:num_det
                 cur_tg = ids(i);

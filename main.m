@@ -72,7 +72,7 @@ for rep = 1:num_rep
         end
     end
     % Create Robots and Planners
-    v_robot = [2]*20;
+    v_robot = 27;
     r_senses = [150];
     fovs = [deg2rad(64)];
     dT_robo = Horizon / run_len * ones(num_robot, 1);
