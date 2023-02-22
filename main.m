@@ -5,18 +5,18 @@ close all;
 vid = false;
 viz = true;
 draw = false;
-planner_name = 'bsg';
+planner_name = 'meta';
 %vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
 vid_name = strcat(strcat('video\one_vs_one_', planner_name),'_test.mp4');
 mode = 'experiment';
 % mode = 'experiment';
 % Experiment parameters
 Horizon = 50;
-num_rep = 1;
+num_rep = 20;
 run_len = 1000;
 dT = Horizon / run_len;
-num_robot = 1;
-num_tg = 1;
+num_robot = 2;
+num_tg = 2;
 map_size = 100;
 rng(1,'philox');
 
@@ -33,16 +33,16 @@ vis_map = init_blank_ndmap([-1000; -1000],[1000; 1000],0.25,'logical');
 
 % Initial pose for robots
 x_true = zeros(run_len+1, num_robot,3,num_rep); % robots
-x_true(1, 1, :, :) = repmat([-150;0;0],1,num_rep);
-% x_true(1, 2, :, :) = repmat([0; -110; pi/2],1,num_rep);
+x_true(1, 1, :, :) = repmat([-50;-110; pi/2],1,num_rep);
+x_true(1, 2, :, :) = repmat([50; -110; pi/2],1,num_rep);
 % x_true(1, 3, :, :) = repmat([-30; 0; pi],1,num_rep);
 % x_true(1, 4, :, :) = repmat([0; -30; 3/2*pi],1,num_rep);
 
 % Initial position for targets
 tg_true = zeros(3,num_tg,run_len+1,num_rep); % dynamic target
 % first two are position, last one is id
-tg_true(:,1,1,:) = repmat([-90;0;1],1,num_rep);
-% tg_true(:,2,1,:) = repmat([0;-120;2],1,num_rep);
+tg_true(:,1,1,:) = repmat([-20;-90;1],1,num_rep);
+tg_true(:,2,1,:) = repmat([20;-90;2],1,num_rep);
 % tg_true(:,3,1,:) = repmat([-80;0;3],1,num_rep);
 % tg_true(:,4,1,:) = repmat([0;-80;4],1,num_rep);
 
@@ -72,23 +72,25 @@ for rep = 1:num_rep
         end
     end
     % Create Robots and Planners
-    v_robot = 27;
-    r_senses = [150];
-    fovs = [deg2rad(64)];
+    v_robot = [1.5; 1]*20;
+    r_senses = [150; 100];
+    fovs = [deg2rad(74); deg2rad(74)];
     dT_robo = Horizon / run_len * ones(num_robot, 1);
     R = init_robots_array(num_robot, reshape(squeeze(x_true(1, :, :, rep)), num_robot, 3), r_senses, fovs, dT_robo);
     for r = 1:num_robot        
         P(r) = bsg_planner_nx_v1(num_robot,r, v_robot(r)*ACTION_SET, run_len, R(r).T, R(r).r_sense,...
             R(r).fov,[R(r).r_sigma;R(r).b_sigma]);
 
-        G(r) = greedy_planner_v2(num_robot, r, ACTION_SET, R(r).T, R(r).r_sense,...
+        G(r) = greedy_planner_v2(num_robot, r, v_robot(r)*ACTION_SET, R(r).T, R(r).r_sense,...
             R(r).fov);
+        
+        M(r) = meta_v1(v_robot(r)*ACTION_SET, 2, run_len);
     end
-    v_tg = 25;
-    yaw_tg = 0;
-    motion_tg = "circle";
-    type_tg = "normal";
-    dT_tg = Horizon / run_len;
+    v_tg = [0.6; 0.4]*20;
+    yaw_tg = [deg2rad(90); deg2rad(90)];
+    motion_tg = ["straight"; "straight"];
+    type_tg = ["adversarial"; "adversarial"];
+    dT_tg = Horizon / run_len * ones(num_tg, 1);
     T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:,:, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
     
     memory_len = 10;
@@ -104,7 +106,7 @@ for rep = 1:num_rep
             [vis_map.pos{2}(1);vis_map.pos{2}(end)],vis_map.map.');
         cbone = bone; colormap(cbone(end:-1:(end-30),:));
               
-        axis([-350,150,-50,450]);
+        axis([-600,600,-300,300]);
         for r = 1:num_robot
             if r == 1
                 r_color = 'b';
@@ -139,7 +141,7 @@ for rep = 1:num_rep
             writeVideo(writerObj, currFrame);
         end
     end
-
+    viz = false;
     % Sense -> Log Measurements -> Plan Moves -> Move Targets -> Move Robots
     for t = 1:run_len
         if t==run_len-1
@@ -180,14 +182,39 @@ for rep = 1:num_rep
                     next_action_idx = discretesample(prob_dist, 1);
                     u_save(t, r, :, rep) = v_robot(r) * ACTION_SET(:, next_action_idx);
                 end
-           else
+            elseif strcmp(planner_name, 'bsg')
                 % BSG: sample actions from p(t) that is based on targets'
                 % positions from 1 to t-1
                 P(r).update_action_prob_dist(t);
                 P(r).selected_action_index(t) = discretesample(P(r).action_prob_dist(t,:), 1);
                 
                 u_save(t, r, :, rep) = v_robot(r) * ACTION_SET(:, P(r).selected_action_index(t));
-            end            
+            else  %meta
+                if t > 1
+                % greedy expert
+                    prev_r_senses = [prev_r_senses R(r).r_sense];
+                    prev_fovs = [prev_fovs R(r).fov];
+                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, [])+randn(2, num_tg)*3, prev_robot_states, prev_r_senses, prev_fovs);
+                else
+                    num_action = size(ACTION_SET, 2);
+                    prob_dist = 1/num_action * ones(num_action, 1);
+                    next_action_idx = discretesample(prob_dist, 1);
+                end
+                
+                P(r).update_action_prob_dist(t);
+                M(r).action_weight(t, 1, next_action_idx) = 1;
+                M(r).action_weight(t, 2, :) = P(r).action_prob_dist(t, :);
+                
+
+                M(r).update_action_prob_dist(t);
+                M(r).selected_action_index(t) = discretesample(M(r).action_prob_dist(t,:), 1);
+                
+                u_save(t, r, :, rep) = v_robot(r) * ACTION_SET(:, M(r).selected_action_index(t));
+                % prepare for planning for next robot
+                if t > 1
+                    prev_robot_states = [prev_robot_states G(r).smm.f(squeeze(x_true(t-1, r, :, rep)), squeeze(u_save(t, r, :, rep)))];
+                end
+           end            
         end
         % Move Robots
         for r = 1:num_robot
@@ -273,7 +300,7 @@ for rep = 1:num_rep
             fovs(i) = R(r).fov;
         end
                 
-        if strcmp(planner_name, 'bsg')
+        if strcmp(planner_name, 'bsg') || strcmp(planner_name, 'meta')
             % BSG: update experts after selecting actions
             prev_robot_states = zeros(3, 0);
             prev_r_senses = zeros(1, 0);
@@ -301,12 +328,26 @@ for rep = 1:num_rep
                         error("wrong reward");
                     end
                     loss = 1 - reward(r, t, rep);
-                    P(r).loss(t, P(r).selected_action_index(t)) = loss;
+                    if strcmp(planner_name, 'bsg')
+                        P(r).loss(t, P(r).selected_action_index(t)) = loss;
+                    else % meta
+                        M(r).loss(t, M(r).selected_action_index(t)) = loss;
+                        P(r).loss(t, M(r).selected_action_index(t)) = loss;
+                    end
                 else
-                    P(r).loss(t, P(r).selected_action_index(t)) = 1;
+                    if strcmp(planner_name, 'bsg')
+                        P(r).loss(t, P(r).selected_action_index(t)) = 1;
+                    else % meta
+                        M(r).loss(t, M(r).selected_action_index(t)) = 1;
+                        P(r).loss(t, M(r).selected_action_index(t)) = 1;
+                    end
                 end
                 % update experts
                 P(r).update_experts(t);
+                if strcmp(planner_name, 'meta')
+                    M(r).update_experts(t);
+                    M(r).expert_weight(t, :)
+                end
             end
         end
        
@@ -347,7 +388,7 @@ for rep = 1:num_rep
             lgd = legend([h0.r_traj(1) h0.y(1)], 'Robot 1', 'Targets', 'location', 'northeast');
             lgd.FontSize = 12;
             legend boxoff;
-            axis([-350,150,-50,450]);
+            axis([-600,600,-300,300]);
 %             if strcmp(planner_name, 'bsg')
 %                 title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
 %             else
@@ -362,12 +403,12 @@ for rep = 1:num_rep
             end
         end
     end
-%     for kk = 1:num_tg
-%         %min_dist(kk, 1:end-1, rep) = T(kk).all_min_dist(:)';
-% %         for t = 1:run_len
-% %             %min_dist(kk, t, rep) = T(kk).min_dist_to_robots(t, squeeze(x_true(t,:,:,rep)));
-% %         end
-%     end
+    for kk = 1:num_tg
+        min_dist(kk, 1:end-1, rep) = T(kk).all_min_dist(:)';
+        for t = 1:run_len
+            min_dist(kk, t, rep) = T(kk).min_dist_to_robots(t, squeeze(x_true(t,:,:,rep)));
+        end
+    end
     if viz && vid
         close(writerObj);
     end
@@ -448,8 +489,8 @@ if strcmp(mode, 'analysis')
     end
     figure('Color',[1 1 1],'Position',[1200 200 500 200]);
 
-    h5 = shadedErrorBar(dT*[1:t], mean(dist_bsg', 1), std(dist_bsg'), 'lineprops',{'Color',"#0072BD", 'LineWidth', 1});
-    h6 = shadedErrorBar(dT*[1:t], mean(dist_greedy', 1), std(dist_greedy'), 'lineprops',{'Color',"#D95319", 'LineWidth', 1});
+    h5 = shadedErrorBar(dT*[1:run_len], mean(dist_bsg', 1), std(dist_bsg'), 'lineprops',{'Color',"#0072BD", 'LineWidth', 1});
+    h6 = shadedErrorBar(dT*[1:run_len], mean(dist_greedy', 1), std(dist_greedy'), 'lineprops',{'Color',"#D95319", 'LineWidth', 1});
     legend([h5.mainLine h6.mainLine], 'BSG', 'SG', 'location','northwest');
     ylabel({'Sum of Minimum Distances'},'FontSize',fnt_sz);
     xlabel('Time [s]','FontSize',fnt_sz);

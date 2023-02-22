@@ -10,8 +10,8 @@ function obj_sum = objective_function(robot_states, target_states, r_senses, fov
     num_tar = size(target_states, 2);
     num_rob = size(robot_states, 2);
     map_size = 500;
-    obj = (-1 / map_size^(2)) * ones(num_tar, 1);
-
+    %obj = (-1 / map_size^(2)) * ones(num_tar, 1);
+    obj = (-1 / map_size) * ones(num_tar, 1);
     if num_rob ~= 0
         for i = 1:num_tar
             target_state = target_states(:, i);
@@ -22,8 +22,8 @@ function obj_sum = objective_function(robot_states, target_states, r_senses, fov
                 %if true
                     % target i is observed by robot j
                     d = norm(robot_state(1:2) - target_state);
-                    obj(i) = obj(i) - 1 / ((d-5)^(2)+1);
-
+                    %obj(i) = obj(i) - 1 / ((d-5)^(2)+1);
+                    obj(i) = obj(i) - 1 / (d+0.1);
 %                     obj(i) = obj(i) * 1 / (d+1);
                     %obj(i) = obj(i) - d;
                 end
