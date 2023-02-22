@@ -44,9 +44,9 @@ classdef meta_v1 < handle
                 this.expert_weight(t+1,j) = this.expert_weight(t, j)*...
                     exp(-this.e*this.loss_estm(t,:)*(reshape(this.action_weight(t, j,:), this.n_actions,[])/norm(squeeze(this.action_weight(t, j,:)),1)));
             end
-            beta = 4/1000;
-            W_t = sum(this.expert_weight(t+1, :));
-            this.expert_weight(t+1, :) = beta*W_t/this.num_expert + (1 - beta)*this.expert_weight(t+1, :);
+%             beta = 4/1000;
+%             W_t = sum(this.expert_weight(t+1, :));
+%             this.expert_weight(t+1, :) = beta*W_t/this.num_expert + (1 - beta)*this.expert_weight(t+1, :);
             this.expert_weight(t+1,:) = this.expert_weight(t+1,:) / norm(squeeze(this.expert_weight(t+1,:)), 1);
 %             if var(this.expert_weight(t+1, :)) > 0.3 %skew enough
 %                 this.expert_weight(t+1,:) = (this.expert_weight(t+1,:) + 1);

@@ -8,11 +8,11 @@ draw = false;
 planner_name = 'meta';
 %vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
 vid_name = strcat(strcat('video\one_vs_one_', planner_name),'_test.mp4');
-mode = 'experiment';
+mode = 'analysis';
 % mode = 'experiment';
 % Experiment parameters
 Horizon = 50;
-num_rep = 20;
+num_rep = 150;
 run_len = 1000;
 dT = Horizon / run_len;
 num_robot = 2;
@@ -65,10 +65,12 @@ for rep = 1:num_rep
     if strcmp(mode, 'analysis')
         viz = false;
         vid = false;
-        if rep <= num_rep / 2
+        if rep <= num_rep / 3
             planner_name = 'bsg';
-        else
+        elseif rep <= 2/3 * num_rep
             planner_name = 'greedy';
+        else
+            planner_name = 'meta';
         end
     end
     % Create Robots and Planners
@@ -170,7 +172,8 @@ for rep = 1:num_rep
                     % TODO: for Greedy, we need to let targets move after Greedy selects actions
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
-                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+                    %[next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
 
                     % prepare for planning for next robot
                     prev_robot_states = [prev_robot_states next_state];
@@ -194,7 +197,8 @@ for rep = 1:num_rep
                 % greedy expert
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
-                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, [])+randn(2, num_tg)*3, prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
+%                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
                 else
                     num_action = size(ACTION_SET, 2);
                     prob_dist = 1/num_action * ones(num_action, 1);
@@ -346,7 +350,7 @@ for rep = 1:num_rep
                 P(r).update_experts(t);
                 if strcmp(planner_name, 'meta')
                     M(r).update_experts(t);
-                    M(r).expert_weight(t, :)
+                    %M(r).expert_weight(t, :)
                 end
             end
         end
@@ -414,76 +418,18 @@ for rep = 1:num_rep
     end
 end
 if strcmp(mode, 'analysis')
-    % Plot Measurement
-    repToShow = 1;
-    total_cost_bsg = zeros(run_len, num_rep/2);
-    total_cost_greedy = zeros(run_len, num_rep/2);
-
+    fnt_sz = 14;
+    dist_bsg = zeros(run_len, num_rep/3);
+    dist_greedy = zeros(run_len, num_rep/3);
+    dist_meta = zeros(run_len, num_rep/3);
     for rep = 1 : num_rep
         for t = 1 : run_len
-            if rep <= num_rep/2
-                total_cost_bsg(t, rep) = gaussian_entropy_nx(all_tg_cov(:,:, t, rep));
-            else
-                total_cost_greedy(t, rep - num_rep/2) = gaussian_entropy_nx(all_tg_cov(:,:, t, rep));
-            end
-        end
-    end
-    fnt_sz = 10;
-    figure('Color',[1 1 1],'Position',[200 200 500 200]);
-    if num_rep == 1
-        plot(1:run_len,mean(total_cost, 2),'b-','linewidth',2);
-    else
-        h1 = shadedErrorBar(1:t, mean(total_cost_bsg', 1), std(total_cost_bsg'), 'lineprops',{'Color',"#77AC30", 'LineWidth', 1});
-        h2 = shadedErrorBar(1:t, mean(total_cost_greedy', 1), std(total_cost_greedy'), 'lineprops',{'Color',"#D95319", 'LineWidth', 1});
-    end
-    legend([h1.mainLine h2.mainLine], 'BSG', 'SG');
-    ylabel({'Target Entropy [nats]'},'FontSize',fnt_sz);
-    xlabel('Time Steps','FontSize',fnt_sz);
-    set(gca,'fontsize',fnt_sz);
-    xlim([0,run_len]);
-    ylim([-5,40]);
-    set(gca,'YTick',[-5 0 5 10 15 20 25 30 35 40]);
-
-    total_obj_bsg = zeros(run_len, num_rep/2);
-    total_obj_greedy = zeros(run_len, num_rep/2);
-    r_senses = zeros(1, num_robot);
-    fovs = zeros(1, num_robot);
-    for i = 1:num_robot
-        r_senses(i) = R(r).r_sense;
-        fovs(i) = R(r).fov;
-    end
-
-    for rep = 1 : num_rep
-        for t = 1 : run_len
-            if rep <= num_rep/2
-                total_obj_bsg(t, rep) = objective_function(squeeze(x_true(t, :, :, rep))', tg_true(1:2,:,t,rep), r_senses, fovs);
-            else
-                total_obj_greedy(t, rep - num_rep/2) = objective_function(squeeze(x_true(t, :, :, rep))', tg_true(1:2,:,t,rep), r_senses, fovs);
-            end
-        end
-    end
-    figure('Color',[1 1 1],'Position',[700 200 500 200]);
-    if num_rep == 1
-        plot(1:run_len,mean(total_cost, 2),'b-','linewidth',2);
-    else
-        h3 = shadedErrorBar(dT*[1:t], mean(total_obj_bsg', 1), std(total_obj_bsg'), 'lineprops',{'Color',"#0072BD", 'LineWidth', 1});
-        h4 = shadedErrorBar(dT*[1:t], mean(total_obj_greedy', 1), std(total_obj_greedy'), 'lineprops',{'Color',"#D95319", 'LineWidth', 1});
-    end
-    legend([h3.mainLine h4.mainLine], 'BSG', 'SG');
-    ylabel({'Objective Function'},'FontSize',fnt_sz);
-    xlabel('Time [s]','FontSize',fnt_sz);
-    set(gca,'fontsize',fnt_sz);
-    xlim([0,run_len*dT]);
-    ylim([-Inf, 0]);
-
-    dist_bsg = zeros(run_len, num_rep/2);
-    dist_greedy = zeros(run_len, num_rep/2);
-    for rep = 1 : num_rep
-        for t = 1 : run_len
-            if rep <= num_rep/2
+            if rep <= num_rep/3
                 dist_bsg(t, rep) = sum(min_dist(:,t, rep));
+            elseif rep <= num_rep *2/3
+                dist_greedy(t, rep - num_rep/3) = sum(min_dist(:,t, rep));
             else
-                dist_greedy(t, rep - num_rep/2) = sum(min_dist(:,t, rep));
+                dist_meta(t, rep - num_rep*2/3) = sum(min_dist(:,t, rep));
             end
         end
     end
@@ -491,10 +437,11 @@ if strcmp(mode, 'analysis')
 
     h5 = shadedErrorBar(dT*[1:run_len], mean(dist_bsg', 1), std(dist_bsg'), 'lineprops',{'Color',"#0072BD", 'LineWidth', 1});
     h6 = shadedErrorBar(dT*[1:run_len], mean(dist_greedy', 1), std(dist_greedy'), 'lineprops',{'Color',"#D95319", 'LineWidth', 1});
-    legend([h5.mainLine h6.mainLine], 'BSG', 'SG', 'location','northwest');
+    h7 = shadedErrorBar(dT*[1:run_len], mean(dist_meta', 1), std(dist_meta'), 'lineprops',{'Color',"#77AC30", 'LineWidth', 1});
+    legend([h5.mainLine h6.mainLine h7.mainLine], 'BSG', 'SG', 'Meta', 'location','northwest');
     ylabel({'Sum of Minimum Distances'},'FontSize',fnt_sz);
     xlabel('Time [s]','FontSize',fnt_sz);
-    savefig('figures/mean_cov_2v3_non.fig');
-    exportgraphics(gca,'figures/mean_cov_2v3_non.png','BackgroundColor','none','ContentType','image')
+    savefig('figures/mean_cov_2v2_accurate.fig');
+    exportgraphics(gca,'figures/mean_cov_2v2_accurate.png','BackgroundColor','none','ContentType','image')
     %title(planner_name);
 end
