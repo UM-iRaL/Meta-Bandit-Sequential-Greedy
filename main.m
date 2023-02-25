@@ -8,12 +8,12 @@ draw = false;
 planner_name = 'meta';
 %vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
 vid_name = strcat(strcat('video\one_vs_one_', planner_name),'_test.mp4');
-mode = 'analysis';
-% mode = 'experiment';
+% mode = 'analysis';
+mode = 'experiment';
 % Experiment parameters
-Horizon = 50;
-num_rep = 150;
-run_len = 1000;
+Horizon = 100;
+num_rep = 10;
+run_len = 2000;
 dT = Horizon / run_len;
 num_robot = 2;
 num_tg = 2;
@@ -45,7 +45,9 @@ tg_true(:,1,1,:) = repmat([-20;-90;1],1,num_rep);
 tg_true(:,2,1,:) = repmat([20;-90;2],1,num_rep);
 % tg_true(:,3,1,:) = repmat([-80;0;3],1,num_rep);
 % tg_true(:,4,1,:) = repmat([0;-80;4],1,num_rep);
-
+human_pred = zeros(2,num_tg,run_len+1,num_rep);
+human_pred(:,1,1,:) = repmat([-20;-90],1,num_rep);
+human_pred(:,2,1,:) = repmat([20;-90],1,num_rep);
 
 % Measurement History Data
 z_d_save = cell(run_len,num_robot,num_rep); % target measurements(range-bearing)
@@ -89,9 +91,9 @@ for rep = 1:num_rep
         M(r) = meta_v1(v_robot(r)*ACTION_SET, 2, run_len);
     end
     v_tg = [0.6; 0.4]*20;
-    yaw_tg = [deg2rad(90); deg2rad(90)];
+    yaw_tg = [deg2rad(70); deg2rad(-20)];
     motion_tg = ["straight"; "straight"];
-    type_tg = ["adversarial"; "adversarial"];
+    type_tg = ["normal"; "normal"];
     dT_tg = Horizon / run_len * ones(num_tg, 1);
     T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:,:, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
     
@@ -108,7 +110,7 @@ for rep = 1:num_rep
             [vis_map.pos{2}(1);vis_map.pos{2}(end)],vis_map.map.');
         cbone = bone; colormap(cbone(end:-1:(end-30),:));
               
-        axis([-600,600,-300,300]);
+        axis([-400,600,-400,600]);
         for r = 1:num_robot
             if r == 1
                 r_color = 'b';
@@ -156,6 +158,11 @@ for rep = 1:num_rep
             for kk = 1:num_tg
                 T(kk).move(t-1, reshape(squeeze(x_true(t-1, :, :, rep)), num_robot,[]));
                 tg_true(:, kk, t, rep) = T(kk).get_position(t)';
+                if kk == 1
+                    human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [0; v_tg(1)]*dT;
+                else
+                    human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [v_tg(2); 0]*dT;
+                end
             end
         end
         % Plan Moves -> compute u_save(t, r, :, rep)
@@ -198,7 +205,7 @@ for rep = 1:num_rep
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
        %             [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
-                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), human_pred(:,:,t-1, rep), prev_robot_states, prev_r_senses, prev_fovs);
                 else
                     num_action = size(ACTION_SET, 2);
                     prob_dist = 1/num_action * ones(num_action, 1);
@@ -312,7 +319,7 @@ for rep = 1:num_rep
 
             r_v = 1:num_robot;
             itr_order = r_v(randperm(length(r_v)));
-            for r =  itr_order% % 1:num_robot%itr_order%
+            for r =  1:num_robot%itr_order%
                 if size(estm_tg_save{t, rep}, 2) ~= 0
 
                     % previous objective function
@@ -350,7 +357,7 @@ for rep = 1:num_rep
                 P(r).update_experts(t);
                 if strcmp(planner_name, 'meta')
                     M(r).update_experts(t);
-                    %M(r).expert_weight(t, :)
+                    M(r).expert_weight(t, :)
                 end
             end
         end
@@ -360,7 +367,7 @@ for rep = 1:num_rep
             set(h0.viz,'cdata',vis_map.map.');
 
             h0.y = draw_traj_nx([],permute(tg_true(:,:,1:t,rep),[3 1 2 4]),'g--');
-
+            h0.human_pred = draw_traj_nx([],permute(human_pred(:,:,1:t,rep),[3 1 2 4]),'c--');
             for r = 1:num_robot
                 if r == 1
                     r_color = 'b';
@@ -392,7 +399,7 @@ for rep = 1:num_rep
             lgd = legend([h0.r_traj(1) h0.y(1)], 'Robot 1', 'Targets', 'location', 'northeast');
             lgd.FontSize = 12;
             legend boxoff;
-            axis([-600,600,-300,300]);
+            axis([-400,600,-400,600]);
 %             if strcmp(planner_name, 'bsg')
 %                 title('BSG: 2 Robots vs. 3 Non-Adversarial Targets [2X]', 'FontSize', 15);
 %             else
@@ -408,7 +415,7 @@ for rep = 1:num_rep
         end
     end
     for kk = 1:num_tg
-        min_dist(kk, 1:end-1, rep) = T(kk).all_min_dist(:)';
+        min_dist(kk, 1:end, rep) = T(kk).all_min_dist(:)';
         for t = 1:run_len
             min_dist(kk, t, rep) = T(kk).min_dist_to_robots(t, squeeze(x_true(t,:,:,rep)));
         end

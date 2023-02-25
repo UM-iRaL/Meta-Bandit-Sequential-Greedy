@@ -40,7 +40,7 @@ classdef bsg_planner_nx_v1 < handle
 %             learning_const = 1; % non-adversarial 2v4
             %learning_const = 4; % adversarial 2v2
             %learning_const = 1; % adversarial 2v3
-            learning_const = 4; %non-adversarial 2v4
+            learning_const = 1; %non-adversarial 2v4
 
             this.J = ceil(log(n_time_step));
             this.e = learning_const*sqrt(log(this.J) / 2 / n_time_step);
@@ -102,7 +102,6 @@ classdef bsg_planner_nx_v1 < handle
 %             end
             q_t = this.expert_weight(t,:);    % 1 * J
             p_t = this.action_weight(t,:,:);  % J * n_actions
-            
             this.action_prob_dist(t, :) = squeeze(q_t) * squeeze(p_t);  % 1 * n_actions
             if sum(isnan(this.action_prob_dist(t, :))) > 0
                 warning("nan value is not valid");
