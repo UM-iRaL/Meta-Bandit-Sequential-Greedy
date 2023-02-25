@@ -172,8 +172,8 @@ for rep = 1:num_rep
                     % TODO: for Greedy, we need to let targets move after Greedy selects actions
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
-                    %[next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
-                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+                    %[next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
 
                     % prepare for planning for next robot
                     prev_robot_states = [prev_robot_states next_state];
@@ -197,8 +197,8 @@ for rep = 1:num_rep
                 % greedy expert
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
-                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
-%                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+       %             [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
                 else
                     num_action = size(ACTION_SET, 2);
                     prob_dist = 1/num_action * ones(num_action, 1);
@@ -441,7 +441,7 @@ if strcmp(mode, 'analysis')
     legend([h5.mainLine h6.mainLine h7.mainLine], 'BSG', 'SG', 'Meta', 'location','northwest');
     ylabel({'Sum of Minimum Distances'},'FontSize',fnt_sz);
     xlabel('Time [s]','FontSize',fnt_sz);
-    savefig('figures/mean_cov_2v2_accurate.fig');
-    exportgraphics(gca,'figures/mean_cov_2v2_accurate.png','BackgroundColor','none','ContentType','image')
+    savefig('figures/mean_cov_2v2_greedy.fig');
+    exportgraphics(gca,'figures/mean_cov_2v2_greedy.png','BackgroundColor','none','ContentType','image')
     %title(planner_name);
 end
