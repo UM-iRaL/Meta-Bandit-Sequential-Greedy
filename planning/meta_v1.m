@@ -30,7 +30,7 @@ classdef meta_v1 < handle
             this.action_prob_dist = zeros(n_time_step, this.n_actions);
             this.expert_weight = 1 / num_expert * ones(n_time_step, num_expert);
             this.action_weight = 1 / this.n_actions * zeros(n_time_step, num_expert, this.n_actions);
-            this.e = 0.017*16;
+            this.e = 0.017;
             
         end
 
@@ -38,7 +38,7 @@ classdef meta_v1 < handle
 
             for j = 1 : this.num_expert
                 this.loss_estm(t, this.selected_action_index(t)) = this.loss(t, this.selected_action_index(t)) /...
-                   (this.action_prob_dist(t, this.selected_action_index(t)) + this.e/2); 
+                   (this.action_prob_dist(t, this.selected_action_index(t))); 
                 % action weight need to be updated from experts first.
                 
                 this.expert_weight(t+1,j) = this.expert_weight(t, j)*...
@@ -50,7 +50,8 @@ classdef meta_v1 < handle
             this.expert_weight(t+1,:) = this.expert_weight(t+1,:) / norm(squeeze(this.expert_weight(t+1,:)), 1);
 %             if var(this.expert_weight(t+1, :)) > 0.3 %skew enough
 %                 this.expert_weight(t+1,:) = (this.expert_weight(t+1,:) + 1);
-%                 this.expert_weight(t+1,:) = this.expert_weight(t+1,:) / norm(squeeze(this.expert_weight(t+1,:)), 1);
+%                 this.expert_weight(t+1,:) = this.expernext_action_idx
+% t_weight(t+1,:) / norm(squeeze(this.expert_weight(t+1,:)), 1);
 %             end
         end
 

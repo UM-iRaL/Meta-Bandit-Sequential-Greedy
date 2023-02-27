@@ -91,7 +91,8 @@ for rep = 1:num_rep
         M(r) = meta_v1(v_robot(r)*ACTION_SET, 2, run_len);
     end
     v_tg = [0.6; 0.4]*20;
-    yaw_tg = [deg2rad(70); deg2rad(-20)];
+%     v_tg = [0.8; 0.6]*20;
+    yaw_tg = [deg2rad(90); deg2rad(0)];
     motion_tg = ["straight"; "straight"];
     type_tg = ["normal"; "normal"];
     dT_tg = Horizon / run_len * ones(num_tg, 1);
@@ -129,9 +130,11 @@ for rep = 1:num_rep
             h0.tg(kk) = draw_pose_nx([], T(kk).get_pose(1)','g',15);
         end
         if strcmp(planner_name, 'bsg')
-            title('BSG: 1 Robots vs. 1 Non-Adversarial Targets [2X]', 'FontSize', 15);
+            title('BSG: 2 Robots vs. 2 Non-Adversarial Targets [2X]', 'FontSize', 15);
+        elseif strcmp(planner_name, 'greedy')
+            title('SG-Heuristic: 2 Robots vs. 2 Non-Adversarial Targets [2X]', 'FontSize', 15);
         else
-            title('SG-Heuristic: 1 Robots vs. 1 Non-Adversarial Targets [2X]', 'FontSize', 15);
+            title('Meta: 2 Robots vs. 2 Non-Adversarial Targets [2X]', 'FontSize', 15);
         end
             subtitle(sprintf('Time: %.2fs, Time Step: %d',0*dT, 0));
         xlabel('x [m]','FontSize',15);
@@ -179,8 +182,8 @@ for rep = 1:num_rep
                     % TODO: for Greedy, we need to let targets move after Greedy selects actions
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
-                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
-                    %[next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
+                    %[next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), squeeze(human_pred(:,:,t-1, rep)), prev_robot_states, prev_r_senses, prev_fovs);
 
                     % prepare for planning for next robot
                     prev_robot_states = [prev_robot_states next_state];
@@ -199,13 +202,13 @@ for rep = 1:num_rep
                 P(r).selected_action_index(t) = discretesample(P(r).action_prob_dist(t,:), 1);
                 
                 u_save(t, r, :, rep) = v_robot(r) * ACTION_SET(:, P(r).selected_action_index(t));
-            else  %meta
+            else  % meta
                 if t > 1
                 % greedy expert
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
        %             [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), reshape(tg_true(1:2,:, t-1, rep), 2, []) + 0*randn(2, num_tg), prev_robot_states, prev_r_senses, prev_fovs);
-                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), human_pred(:,:,t-1, rep), prev_robot_states, prev_r_senses, prev_fovs);
+                    [next_action_idx, ~] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), squeeze(human_pred(:,:,t-1, rep)), prev_robot_states, prev_r_senses, prev_fovs);
                 else
                     num_action = size(ACTION_SET, 2);
                     prob_dist = 1/num_action * ones(num_action, 1);
@@ -213,12 +216,14 @@ for rep = 1:num_rep
                 end
                 
                 P(r).update_action_prob_dist(t);
+                % assign prob for greedy-> expert 1 and bsg -> expert 2
                 M(r).action_weight(t, 1, next_action_idx) = 1;
                 M(r).action_weight(t, 2, :) = P(r).action_prob_dist(t, :);
                 
 
                 M(r).update_action_prob_dist(t);
                 M(r).selected_action_index(t) = discretesample(M(r).action_prob_dist(t,:), 1);
+                P(r).selected_action_index(t) = M(r).selected_action_index(t);
                 
                 u_save(t, r, :, rep) = v_robot(r) * ACTION_SET(:, M(r).selected_action_index(t));
                 % prepare for planning for next robot
@@ -319,7 +324,7 @@ for rep = 1:num_rep
 
             r_v = 1:num_robot;
             itr_order = r_v(randperm(length(r_v)));
-            for r =  1:num_robot%itr_order%
+            for r = itr_order %1:num_robot%itr_order%
                 if size(estm_tg_save{t, rep}, 2) ~= 0
 
                     % previous objective function
@@ -341,7 +346,7 @@ for rep = 1:num_rep
                     loss = 1 - reward(r, t, rep);
                     if strcmp(planner_name, 'bsg')
                         P(r).loss(t, P(r).selected_action_index(t)) = loss;
-                    else % meta
+                    elseif strcmp(planner_name, 'meta') % meta
                         M(r).loss(t, M(r).selected_action_index(t)) = loss;
                         P(r).loss(t, M(r).selected_action_index(t)) = loss;
                     end
@@ -357,7 +362,7 @@ for rep = 1:num_rep
                 P(r).update_experts(t);
                 if strcmp(planner_name, 'meta')
                     M(r).update_experts(t);
-                    M(r).expert_weight(t, :)
+                    %M(r).expert_weight(t, :)
                 end
             end
         end
@@ -367,7 +372,7 @@ for rep = 1:num_rep
             set(h0.viz,'cdata',vis_map.map.');
 
             h0.y = draw_traj_nx([],permute(tg_true(:,:,1:t,rep),[3 1 2 4]),'g--');
-            h0.human_pred = draw_traj_nx([],permute(human_pred(:,:,1:t,rep),[3 1 2 4]),'c--');
+            h0.human_pred = draw_traj_nx([],permute(human_pred(:,:,1:t,rep),[3 1 2 4]),'m--');
             for r = 1:num_robot
                 if r == 1
                     r_color = 'b';
