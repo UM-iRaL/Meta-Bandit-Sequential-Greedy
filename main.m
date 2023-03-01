@@ -16,8 +16,9 @@ num_rep = 10;
 run_len = 2000;
 dT = Horizon / run_len;
 num_robot = 2;
-num_tg = 2;
+num_tg = 3;
 map_size = 100;
+type_tg = "normal";
 rng(1,'philox');
 
 % Action set for robots
@@ -33,16 +34,16 @@ vis_map = init_blank_ndmap([-1000; -1000],[1000; 1000],0.25,'logical');
 
 % Initial pose for robots
 x_true = zeros(run_len+1, num_robot,3,num_rep); % robots
-x_true(1, 1, :, :) = repmat([-50;-110; pi/2],1,num_rep);
-x_true(1, 2, :, :) = repmat([50; -110; pi/2],1,num_rep);
+%x_true(1, 1, :, :) = repmat([-50;-110; pi/2],1,num_rep);
+%x_true(1, 2, :, :) = repmat([50; -110; pi/2],1,num_rep);
 % x_true(1, 3, :, :) = repmat([-30; 0; pi],1,num_rep);
 % x_true(1, 4, :, :) = repmat([0; -30; 3/2*pi],1,num_rep);
 
 % Initial position for targets
 tg_true = zeros(3,num_tg,run_len+1,num_rep); % dynamic target
 % first two are position, last one is id
-tg_true(:,1,1,:) = repmat([-20;-90;1],1,num_rep);
-tg_true(:,2,1,:) = repmat([20;-90;2],1,num_rep);
+%tg_true(:,1,1,:) = repmat([-20;-90;1],1,num_rep);
+%tg_true(:,2,1,:) = repmat([20;-90;2],1,num_rep);
 % tg_true(:,3,1,:) = repmat([-80;0;3],1,num_rep);
 % tg_true(:,4,1,:) = repmat([0;-80;4],1,num_rep);
 human_pred = zeros(2,num_tg,run_len+1,num_rep);
@@ -75,10 +76,13 @@ for rep = 1:num_rep
             planner_name = 'meta';
         end
     end
+    [x_true_init, tg_true_init, v_robot, r_senses, fovs, v_tg, yaw_tg, motion_tg] = senarios_settings(num_robot, num_tg, type_tg);
+    x_true(1, :, :, rep) = x_true_init;
+    tg_true(:,:, 1, rep) = tg_true_init;
     % Create Robots and Planners
-    v_robot = [1.5; 1]*20;
-    r_senses = [150; 100];
-    fovs = [deg2rad(74); deg2rad(74)];
+    %v_robot = [1.5; 1]*20;
+    %r_senses = [150; 100];
+    %fovs = [deg2rad(74); deg2rad(74)];
     dT_robo = Horizon / run_len * ones(num_robot, 1);
     R = init_robots_array(num_robot, reshape(squeeze(x_true(1, :, :, rep)), num_robot, 3), r_senses, fovs, dT_robo);
     for r = 1:num_robot        
@@ -90,19 +94,19 @@ for rep = 1:num_rep
         
         M(r) = meta_v1(v_robot(r)*ACTION_SET, 2, run_len);
     end
-    v_tg = [0.6; 0.4]*20;
+    %v_tg = [0.6; 0.4]*20;
 %     v_tg = [0.8; 0.6]*20;
-    yaw_tg = [deg2rad(90); deg2rad(0)];
-    motion_tg = ["straight"; "straight"];
-    type_tg = ["normal"; "normal"];
+    %yaw_tg = [deg2rad(90); deg2rad(0)];
+    %motion_tg = ["straight"; "straight"];
+    %type_tg = ["normal"; "normal"];
     dT_tg = Horizon / run_len * ones(num_tg, 1);
-    T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:,:, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
+    T = init_targets_array(num_tg, type_tg, v_tg, tg_true(:, :, 1, rep), yaw_tg, run_len, motion_tg, dT_tg);
     
-    memory_len = 10;
-    memory_noise = 0.05;
-    predict_horizon = 1 / Horizon * run_len; % unit: time step
-    human_expert = human_nx(num_tg, memory_len, memory_noise, predict_horizon);
-    last_time_mem = 1;
+%     memory_len = 10;
+%     memory_noise = 0.05;
+%     predict_horizon = 1 / Horizon * run_len; % unit: time step
+%     human_expert = human_nx(num_tg, memory_len, memory_noise, predict_horizon);
+%     last_time_mem = 1;
     % Visualization
     if viz
         figure('Color',[1 1 1],'Position',[0,0,900,800]);
@@ -156,16 +160,24 @@ for rep = 1:num_rep
                 viz = true;
             end
         end
+        if num_robot == 2 && num_tg == 3 && strcmp(type_tg, 'normal')
+            if t == floor(490/2000 * run_len)
+                T(3).set_v(10);
+                T(3).set_yaw(t-1, deg2rad(90));
+                T(3).set_type('straight');
+            end
+        end
         % Move Targets and get targets' positions at t
         if t > 1
             for kk = 1:num_tg
                 T(kk).move(t-1, reshape(squeeze(x_true(t-1, :, :, rep)), num_robot,[]));
                 tg_true(:, kk, t, rep) = T(kk).get_position(t)';
-                if kk == 1
-                    human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [0; v_tg(1)]*dT;
-                else
-                    human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [v_tg(2); 0]*dT;
-                end
+                human_pred(:,kk,t,rep) = tg_true(1:2, kk, t, rep);
+%                 if kk == 1
+%                     human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [0; v_tg(1)]*dT;
+%                 else
+%                     human_pred(:, kk, t, rep) = human_pred(:, kk, t-1, rep) + [v_tg(2); 0]*dT;
+%                 end
             end
         end
         % Plan Moves -> compute u_save(t, r, :, rep)
@@ -290,13 +302,7 @@ for rep = 1:num_rep
         id_array = 1:num_tg;
         ids = id_array(detected);
         pred = [];
-        
-        if (t - last_time_mem) >= 0.25 / Horizon * run_len
-            human_expert.memorize(t, estm_tg, ids);
-            pred = human_expert.predictBezier;
-            last_time_mem = t;
-        end
-        
+                
         for kk = 1:num_tg
             if ~detected(kk)
                 cov_z = [R(r).r_sigma 0; 0 R(r).b_sigma];
@@ -394,13 +400,13 @@ for rep = 1:num_rep
             for kk = 1 : num_tg
                 h0.tg(kk) = draw_pose_nx(h0.tg(kk), T(kk).get_pose(t)','g',15);
             end
-            if ~isempty(pred)
-                for kk = 1 : size(pred, 2)
-                    id = pred(1, kk);
-                    pred_line = [human_expert.tar_cur(:, kk) pred(2:end, kk)];
-                    h0.pred = draw_pred_nx(h0.pred, pred_line);
-                end
-            end
+%             if ~isempty(pred)
+%                 for kk = 1 : size(pred, 2)
+%                     id = pred(1, kk);
+%                     pred_line = [human_expert.tar_cur(:, kk) pred(2:end, kk)];
+%                     h0.pred = draw_pred_nx(h0.pred, pred_line);
+%                 end
+%             end
             lgd = legend([h0.r_traj(1) h0.y(1)], 'Robot 1', 'Targets', 'location', 'northeast');
             lgd.FontSize = 12;
             legend boxoff;

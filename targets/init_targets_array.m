@@ -12,12 +12,12 @@ function targets_array = init_targets_array(num_tg, type_tg, v_tg, tg_position, 
 % targetsArray: array of targets
 
 if size(v_tg, 1) ~= num_tg || size(yaw_tg, 1) ~= num_tg || size(motion_tg, 1) ~= num_tg ...
-   || size(tg_position, 2) ~= num_tg || size(type_tg, 1) ~= num_tg || size(dT_tg, 1) ~= num_tg
+   || size(tg_position, 2) ~= num_tg || size(dT_tg, 1) ~= num_tg
     error('dimensions mismatch');
 end
 
 for kk = 1 : num_tg
-    if strcmp(type_tg(kk), "normal")
+    if strcmp(type_tg, "normal")
         targets_array(kk) = target_v1(v_tg(kk), tg_position(:, kk), yaw_tg(kk), run_len, motion_tg(kk), dT_tg(kk));
     else
         targets_array(kk) = adversarial_target_v1(v_tg(kk), tg_position(:, kk), yaw_tg(kk), run_len, motion_tg(kk), dT_tg(kk));
