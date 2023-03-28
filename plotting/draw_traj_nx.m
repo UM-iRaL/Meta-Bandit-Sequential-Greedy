@@ -22,9 +22,9 @@ end
 if(isempty(h))
     
     if( size(traj,3) > 2 )
-        h = plot3(traj(:,:,1),traj(:,:,2),traj(:,:,3),varargin{:}, 'LineWidth', 1.5);
+        h = plot3(traj(:,:,1),traj(:,:,2),traj(:,:,3),varargin{:}, 'LineWidth', 2.5);
     else
-        h = plot(traj(:,:,1),traj(:,:,2),varargin{:}, 'LineWidth', 1.5);
+        h = plot(traj(:,:,1),traj(:,:,2),varargin{:}, 'LineWidth', 2.5);
     end
 
     %for k = 1:num_traj

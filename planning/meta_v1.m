@@ -30,7 +30,7 @@ classdef meta_v1 < handle
             this.action_prob_dist = zeros(n_time_step, this.n_actions);
             this.expert_weight = 1 / num_expert * ones(n_time_step, num_expert);
             this.action_weight = 1 / this.n_actions * zeros(n_time_step, num_expert, this.n_actions);
-            this.e = 0.017;
+            this.e = 0.017; %1 2v2 human bad % 2 2v3 human
             
         end
 

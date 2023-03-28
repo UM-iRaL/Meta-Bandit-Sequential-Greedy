@@ -41,7 +41,7 @@ classdef human_nx < handle
             pred = zeros(4, 0);
             for i = 1:size(this.targetsLogger, 1)
                 curr_W = cell2mat(this.targetsLogger(i).elements);  % current waypoints.
-                if size(curr_W, 2) == 1 || size(curr_W, 2) == 0
+                if size(curr_W, 2) == 1 || size(curr_W, 2) == 0 % if we don't have any data we don't do predictions.
                     continue;
                 end
                 last_time_interval = curr_W(1, end) - curr_W(1, end - 1);

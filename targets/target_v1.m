@@ -28,9 +28,9 @@ classdef target_v1 < handle
             this.all_min_dist = zeros(n_time_step, 1);
         end
         function min_dist = min_dist_to_robots(this, t, pos_r)
-            if size(pos_r, 2) ~= 3
-                error('dimensions mismatch');
-            end
+%             if size(pos_r, 2) ~= 3
+%                 error('dimensions mismatch');
+%             end
             cur_x = this.x(t, 1:2)';
             dist_vec = cur_x - pos_r(:, 1:2)';
             [min_dist_sqr, ~] = min(dist_vec(1, :).^2 + dist_vec(2, :).^2);

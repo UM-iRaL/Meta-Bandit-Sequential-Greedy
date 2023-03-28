@@ -11,13 +11,12 @@ function robots_array = init_robots_array(num_robot, x_position, r_senses, fovs,
 if size(r_senses, 1) ~= num_robot || size(fovs, 1) ~= num_robot || size(x_position, 1) ~= num_robot 
     error('dimension mismatch');
 end
-
+if dTs/dTs(1) ~= ones(num_robot,1)
+    error('we do not support different sampling time currently.')
+end
 for r = 1:num_robot
     if dTs(r) <= 0
         error('sampling period cannnot be negative.');
-    end
-    if dTs/dTs(1) ~= ones(r,1)
-        error('we do not support different sampling time currently.')
     end
 end
 
