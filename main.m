@@ -9,8 +9,8 @@ planner_name = 'meta';
 base_learner = 'human'; % option: greedy or human
 %vid_name = strcat(strcat('video\two_vs_three_', planner_name),'_test.mp4');
 vid_name = strcat(strcat('video\one_vs_one_', planner_name),'_test.mp4');
-mode = 'analysis';
-% mode = 'experiment';
+% mode = 'analysis';
+mode = 'experiment';
 % Experiment parameters
 Horizon = 100;
 num_rep = 10;
@@ -194,7 +194,6 @@ for rep = 1:num_rep
                     % Greedy: select actions based on targets' positions at t-1,
                     % so for Greedy, targets should move to positions at t
                     % after Greedy selects actions
-                    % TODO: for Greedy, we need to let targets move after Greedy selects actions
                     prev_r_senses = [prev_r_senses R(r).r_sense];
                     prev_fovs = [prev_fovs R(r).fov];
 %                     [next_action_idx, next_state] = G(r).greedy_action(t, squeeze(x_true(t-1, r, :, rep)), estm_tg_save{t-1, rep}, prev_robot_states, prev_r_senses, prev_fovs);
